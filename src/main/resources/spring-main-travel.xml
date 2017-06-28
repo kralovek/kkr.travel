@@ -20,13 +20,13 @@
 
     <bean id="travelReader"
         class="kkr.travel.components.travel.reader.excelpoi.TravelReaderExcelPoi">
-        <property name="file" value="travel.xlsx" />
+        <property name="file" value="wrk/travel.xlsx" />
         <property name="sheet" value="TRAVEL" />
     </bean>
 
     <bean id="travelWriter"
         class="kkr.travel.components.travel.writer.html.TravelWriterHtml">
-        <property name="file" value="travel.html" />
+        <property name="file" value="wrk/travel.html" />
     </bean>
 
 </beans>    
