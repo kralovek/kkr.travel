@@ -17,16 +17,15 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 
 import kkr.common.errors.BaseException;
-import kkr.common.utils.UtilsResource;
-import kkr.common.utils.excel.ExcelConfigurationException;
+import kkr.common.errors.ExcelException;
 import kkr.common.utils.excel.ExcelPosition;
-import kkr.common.utils.excel.poi.ExcelPoiUtils;
-import kkr.common.utils.excel.poi.PoiManipulator;
-import kkr.common.utils.excel.poi.PoiWorkbook;
 import kkr.travel.components.travel.data.Constants;
 import kkr.travel.components.travel.data.LinkData;
 import kkr.travel.components.travel.data.TravelData;
 import kkr.travel.components.travel.reader.TravelReader;
+import kkr.travel.utils.excel.poi.ExcelPoiUtils;
+import kkr.travel.utils.excel.poi.PoiManipulator;
+import kkr.travel.utils.excel.poi.PoiWorkbook;
 
 public class TravelReaderExcelPoi extends TravelReaderExcelPoiFwk implements TravelReader, Constants {
 	private static final Logger LOG = Logger.getLogger(TravelReaderExcelPoi.class);
@@ -49,7 +48,7 @@ public class TravelReaderExcelPoi extends TravelReaderExcelPoiFwk implements Tra
 
 				Sheet sheet = poiWorkbook.getWorkbook().getSheet(this.sheet);
 				if (sheet == null) {
-					throw new ExcelConfigurationException(excelPosition, "The sheet not found in the workbook: " + this.sheet);
+					throw new ExcelException(excelPosition, "The sheet not found in the workbook: " + this.sheet);
 				}
 				excelPosition.setSheet(this.sheet);
 
@@ -60,7 +59,11 @@ public class TravelReaderExcelPoi extends TravelReaderExcelPoiFwk implements Tra
 				PoiManipulator.closeWorkbook(poiWorkbook);
 				poiWorkbook = null;
 			} finally {
-				UtilsResource.closeResource(poiWorkbook);
+				try {
+					PoiManipulator.closeWorkbook(poiWorkbook);
+				} catch (Exception ex) {
+					// nothing to do
+				}
 			}
 
 			LOG.trace("OK");
@@ -82,7 +85,7 @@ public class TravelReaderExcelPoi extends TravelReaderExcelPoiFwk implements Tra
 			excelPosition.setRow(0);
 
 			if (row == null) {
-				throw new ExcelConfigurationException(excelPosition, "The sheet not found in the workbook: " + this.sheet);
+				throw new ExcelException(excelPosition, "The sheet not found in the workbook: " + this.sheet);
 			}
 
 			int nColumns = row.getLastCellNum();
@@ -114,15 +117,15 @@ public class TravelReaderExcelPoi extends TravelReaderExcelPoiFwk implements Tra
 				found |= readHeaderColumn(excelPosition, retval, COLUMN_PLACES, i, value);
 
 				if (!found) {
-					throw new ExcelConfigurationException(excelPosition, "Unknown column: " + value);
+					throw new ExcelException(excelPosition, "Unknown column: " + value);
 				}
 			}
 
 			if (!retval.containsKey(COLUMN_NAME)) {
-				throw new ExcelConfigurationException(excelPosition, "Missing mandatory column: " + COLUMN_NAME);
+				throw new ExcelException(excelPosition, "Missing mandatory column: " + COLUMN_NAME);
 			}
 			if (!retval.containsKey(COLUMN_DATE_FROM)) {
-				throw new ExcelConfigurationException(excelPosition, "Missing mandatory column: " + COLUMN_DATE_FROM);
+				throw new ExcelException(excelPosition, "Missing mandatory column: " + COLUMN_DATE_FROM);
 			}
 
 			LOG.trace("OK");
@@ -132,10 +135,11 @@ public class TravelReaderExcelPoi extends TravelReaderExcelPoiFwk implements Tra
 		}
 	}
 
-	private boolean readHeaderColumn(ExcelPosition excelPosition, Map<String, Integer> map, String columnName, int columnIndex, String value) {
+	private boolean readHeaderColumn(ExcelPosition excelPosition, Map<String, Integer> map, String columnName, int columnIndex, String value)
+			throws BaseException {
 		if (columnName.equals(value)) {
 			if (map.containsKey(columnName)) {
-				throw new ExcelConfigurationException(excelPosition, "The column already exists in the file: " + columnName);
+				throw new ExcelException(excelPosition, "The column already exists in the file: " + columnName);
 			}
 			map.put(columnName, columnIndex);
 			return true;
@@ -189,7 +193,7 @@ public class TravelReaderExcelPoi extends TravelReaderExcelPoiFwk implements Tra
 
 		String valueName = ExcelPoiUtils.readValueString(excelPosition, poiWorkbook, cell);
 		if (isEmpty(valueName)) {
-			throw new ExcelConfigurationException(excelPosition, COLUMN_NAME + " is mandatory");
+			throw new ExcelException(excelPosition, COLUMN_NAME + " is mandatory");
 		}
 
 		TravelData retval = new TravelData(valueName);
@@ -203,15 +207,15 @@ public class TravelReaderExcelPoi extends TravelReaderExcelPoiFwk implements Tra
 
 		Object valueDateFrom = ExcelPoiUtils.readValue(excelPosition, poiWorkbook, cell);
 		if (isEmpty(valueDateFrom)) {
-			throw new ExcelConfigurationException(excelPosition, COLUMN_DATE_FROM + " is mandatory");
+			throw new ExcelException(excelPosition, COLUMN_DATE_FROM + " is mandatory");
 		}
 
 		Date date = toDate(valueDateFrom);
 		if (date == null) {
-			throw new ExcelConfigurationException(excelPosition, COLUMN_DATE_FROM + " value is not a date: " + String.valueOf(valueDateFrom));
+			throw new ExcelException(excelPosition, COLUMN_DATE_FROM + " value is not a date: " + String.valueOf(valueDateFrom));
 		}
 		retval.setDateFrom(date);
-		
+
 		//
 		// DATE TO
 		//
@@ -224,7 +228,7 @@ public class TravelReaderExcelPoi extends TravelReaderExcelPoiFwk implements Tra
 			if (!isEmpty(valueDateTo)) {
 				date = toDate(valueDateTo);
 				if (date == null) {
-					throw new ExcelConfigurationException(excelPosition, COLUMN_DATE_TO + " value is not a date: " + String.valueOf(valueDateTo));
+					throw new ExcelException(excelPosition, COLUMN_DATE_TO + " value is not a date: " + String.valueOf(valueDateTo));
 				}
 				retval.setDateTo(date);
 			}
@@ -267,7 +271,7 @@ public class TravelReaderExcelPoi extends TravelReaderExcelPoiFwk implements Tra
 					URL url = new URL(value);
 					retval.setImmageTitle(url);
 				} catch (MalformedURLException ex) {
-					throw new ExcelConfigurationException(excelPosition, COLUMN_IMMAGE_TITLE + " value is not a URL: " + value);
+					throw new ExcelException(excelPosition, COLUMN_IMMAGE_TITLE + " value is not a URL: " + value);
 				}
 			}
 		}
@@ -285,7 +289,7 @@ public class TravelReaderExcelPoi extends TravelReaderExcelPoiFwk implements Tra
 					URL url = new URL(value);
 					retval.setImmageMap(url);
 				} catch (MalformedURLException ex) {
-					throw new ExcelConfigurationException(excelPosition, COLUMN_IMMAGE_MAP + " value is not a URL: " + value);
+					throw new ExcelException(excelPosition, COLUMN_IMMAGE_MAP + " value is not a URL: " + value);
 				}
 			}
 		}
@@ -363,7 +367,7 @@ public class TravelReaderExcelPoi extends TravelReaderExcelPoiFwk implements Tra
 		}
 	}
 
-	private Collection<String> toListString(ExcelPosition excelPosition, String column, String value) {
+	private Collection<String> toListString(ExcelPosition excelPosition, String column, String value) throws BaseException {
 		Collection<String> retval = new ArrayList<String>();
 
 		if (value == null) {
@@ -379,7 +383,7 @@ public class TravelReaderExcelPoi extends TravelReaderExcelPoiFwk implements Tra
 		for (int i = 0; i < parts.length; i++) {
 			parts[i] = parts[i].trim();
 			if (isEmpty(parts[i])) {
-				throw new ExcelConfigurationException(excelPosition, column + " value of list is empty");
+				throw new ExcelException(excelPosition, column + " value of list is empty");
 			}
 			retval.add(parts[i]);
 		}
@@ -387,7 +391,7 @@ public class TravelReaderExcelPoi extends TravelReaderExcelPoiFwk implements Tra
 		return retval;
 	}
 
-	private Collection<LinkData> toListLink(ExcelPosition excelPosition, String column, Collection<String> linksString) {
+	private Collection<LinkData> toListLink(ExcelPosition excelPosition, String column, Collection<String> linksString) throws BaseException {
 		Collection<LinkData> retval = new ArrayList<LinkData>();
 		if (linksString != null && !linksString.isEmpty()) {
 			for (String value : linksString) {
@@ -398,14 +402,14 @@ public class TravelReaderExcelPoi extends TravelReaderExcelPoiFwk implements Tra
 		return retval;
 	}
 
-	private LinkData toLinkData(ExcelPosition excelPosition, String column, String value) {
+	private LinkData toLinkData(ExcelPosition excelPosition, String column, String value) throws BaseException {
 		String name = null;
 		String urlString;
 		URL url;
 		if (value.startsWith("[")) {
 			int pos = value.indexOf("]", 1);
 			if (pos == -1) {
-				throw new ExcelConfigurationException(excelPosition, column + " Bad format of the [name] URL: " + value);
+				throw new ExcelException(excelPosition, column + " Bad format of the [name] URL: " + value);
 			}
 			name = value.substring(1, pos).trim();
 			urlString = value.substring(pos + 1).trim();
@@ -415,7 +419,7 @@ public class TravelReaderExcelPoi extends TravelReaderExcelPoiFwk implements Tra
 		try {
 			url = new URL(urlString);
 		} catch (MalformedURLException ex) {
-			throw new ExcelConfigurationException(excelPosition, COLUMN_IMMAGE_MAP + " value is not a URL: " + value);
+			throw new ExcelException(excelPosition, COLUMN_IMMAGE_MAP + " value is not a URL: " + value);
 		}
 		LinkData linkData = new LinkData(name, url);
 		return linkData;
